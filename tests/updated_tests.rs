@@ -173,7 +173,7 @@ fn test_error_cases() {
     let self_loop_csv = "source,target,distance\nID1,ID1,0.01";
     let mut network = TransmissionNetwork::new();
     let result = network.read_from_csv_str(self_loop_csv, 0.03, InputFormat::Plain);
-    assert!(result.is_ok(), "Should handle self-loops by skipping them");
+    assert!(result.is_err(), "Should reject self-loops with an error");
     assert_eq!(network.get_edge_count(), 0, "Should not add self-loop edge");
     
     // Test empty CSV

@@ -1,4 +1,4 @@
-use hivcluster_rs::build_network_internal;
+use hivcluster_rs::{InputFormat, TransmissionNetwork};
 use std::time::Instant;
 
 #[test]
@@ -29,12 +29,16 @@ fn test_performance() {
         }
     }
     
-    // Measure time to construct the network
+    // Create the network
+    let mut network = TransmissionNetwork::new();
+    
+    // Measure time to parse CSV and build adjacency
     let start = Instant::now();
-    let mut network = build_network_internal(&csv_data, 0.03).unwrap();
+    network.read_from_csv_str(&csv_data, 0.03, InputFormat::Plain).unwrap();
+    network.compute_adjacency();
     let build_time = start.elapsed();
     
-    println!("Built network with {} nodes in {:?}", network.nodes.len(), build_time);
+    println!("Built network with {} nodes in {:?}", network.get_node_count(), build_time);
     
     // Measure time to compute clusters
     let start = Instant::now();
@@ -49,10 +53,16 @@ fn test_performance() {
     let json = network.to_json();
     let json_time = start.elapsed();
     
+    // Print summary information - using the network_summary section
     println!("Generated JSON with {} nodes and {} edges in {:?}", 
-             json.nodes.len(), json.edges.len(), json_time);
+             json.trace_results.network_summary.Nodes, 
+             json.trace_results.network_summary.Edges, 
+             json_time);
     
     // Basic verification that network is constructed correctly
-    assert!(network.nodes.len() > 0, "Should have created a network");
-    assert!(network.edges.len() > 0, "Should have edges");
+    assert!(network.get_node_count() > 0, "Should have created a network");
+    assert!(network.get_edge_count() > 0, "Should have edges");
+    
+    // Verify that we have appropriate clustering
+    assert!(clusters.len() > 0, "Should have created clusters");
 }

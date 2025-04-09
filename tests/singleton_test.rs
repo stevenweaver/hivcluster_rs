@@ -1,13 +1,11 @@
 use hivcluster_rs::{TransmissionNetwork, InputFormat};
 
 // Test data with nodes that have no connections (singletons)
-const SINGLETON_CSV: &str = r#"source,target,distance
-ID1,ID2,0.01
+const SINGLETON_CSV: &str = r#"ID1,ID2,0.01
 ID3,ID4,0.02
 ID5,ID6,0.01
 ID7,ID8,0.2
-ID9,ID10,0.3
-"#;
+ID9,ID10,0.3"#;
 
 // We expect 3 clusters in this data with threshold 0.15:
 // Cluster 1: ID1-ID2 (connected)

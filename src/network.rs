@@ -173,20 +173,26 @@ impl TransmissionNetwork {
         distance_threshold: f64,
         format: InputFormat,
     ) -> Result<(), NetworkError> {
+        // Check for empty input
+        if csv_str.trim().is_empty() {
+            return Err(NetworkError::Format("Empty CSV input".to_string()));
+        }
+        
         // Set threshold in metadata for later use
         self.metadata.insert("threshold".to_string(), serde_json::json!(distance_threshold));
         
+        // Try to detect if the CSV has headers - this is a heuristic
+        let has_headers = csv_str.lines().next()
+            .map(|first_line| {
+                let columns: Vec<&str> = first_line.split(',').collect();
+                columns.len() >= 3 && columns[2].trim() == "distance"
+            })
+            .unwrap_or(false);
+        
         let mut reader = csv::ReaderBuilder::new()
             .flexible(true)
+            .has_headers(has_headers) // Auto-detect headers
             .from_reader(csv_str.as_bytes());
-        
-        // Validate CSV header
-        let headers = reader.headers().map_err(|e| NetworkError::Csv(e))?;
-        if headers.len() < 3 {
-            return Err(NetworkError::Format(
-                "CSV must have at least 3 columns: node1,node2,distance".to_string()
-            ));
-        }
         
         // First pass: track all node IDs and collect valid edges
         let mut edges_to_add = Vec::new();
@@ -229,7 +235,7 @@ impl TransmissionNetwork {
             
             // Skip self loops (same ID for both nodes)
             if id1 == id2 {
-                continue;
+                return Err(NetworkError::SelfLoop);
             }
             
             // Parse node IDs
@@ -317,21 +323,22 @@ impl TransmissionNetwork {
             return Ok(());
         }
         
-        // Add edge to the adjacency lists
-        self.adjacency.entry(edge.source_id.clone())
+        // Add edge to the adjacency lists using original patient IDs 
+        // (not the normalized edge IDs)
+        self.adjacency.entry(patient1.id.clone())
             .or_insert_with(Vec::new)
-            .push(edge.target_id.clone());
+            .push(patient2.id.clone());
             
-        self.adjacency.entry(edge.target_id.clone())
+        self.adjacency.entry(patient2.id.clone())
             .or_insert_with(Vec::new)
-            .push(edge.source_id.clone());
+            .push(patient1.id.clone());
             
-        // Update node degrees
-        if let Some(node) = self.nodes.get_mut(&edge.source_id) {
+        // Update node degrees using original patient IDs
+        if let Some(node) = self.nodes.get_mut(&patient1.id) {
             node.increment_degree();
         }
         
-        if let Some(node) = self.nodes.get_mut(&edge.target_id) {
+        if let Some(node) = self.nodes.get_mut(&patient2.id) {
             node.increment_degree();
         }
         
@@ -365,13 +372,17 @@ impl TransmissionNetwork {
                 continue;
             }
             
-            self.adjacency.entry(edge.source_id.clone())
+            // Use both IDs without normalization for proper connectivity
+            let id1 = edge.source_id.clone();
+            let id2 = edge.target_id.clone();
+            
+            self.adjacency.entry(id1.clone())
                 .or_insert_with(Vec::new)
-                .push(edge.target_id.clone());
+                .push(id2.clone());
                 
-            self.adjacency.entry(edge.target_id.clone())
+            self.adjacency.entry(id2)
                 .or_insert_with(Vec::new)
-                .push(edge.source_id.clone());
+                .push(id1);
         }
     }
     
@@ -385,15 +396,38 @@ impl TransmissionNetwork {
         let mut cluster_id = 0;
         let mut visited = HashSet::new();
         
-        // Process each node
+        // First, assign clusters to connected nodes
         for node_id in self.nodes.keys().cloned().collect::<Vec<String>>() {
             if visited.contains(&node_id) {
                 continue;
             }
             
+            // Skip singleton nodes (they'll be processed separately)
+            if let Some(node) = self.nodes.get(&node_id) {
+                if node.degree == 0 {
+                    continue;
+                }
+            }
+            
             // BFS to find all nodes in this cluster
             self.breadth_first_traverse(&node_id, cluster_id, &mut visited);
             cluster_id += 1;
+        }
+        
+        // Now assign singleton nodes to their own clusters
+        for node_id in self.nodes.keys().cloned().collect::<Vec<String>>() {
+            if visited.contains(&node_id) {
+                continue;
+            }
+            
+            // This must be a singleton (no connections)
+            if let Some(node) = self.nodes.get_mut(&node_id) {
+                if node.degree == 0 {
+                    node.cluster_id = Some(cluster_id);
+                    visited.insert(node_id.clone());
+                    cluster_id += 1;
+                }
+            }
         }
     }
     
@@ -508,13 +542,13 @@ impl TransmissionNetwork {
         }
         
         // Count real clusters with 2+ connected nodes
-        let real_clusters = real_cluster_ids.len();
+        // We use the connected_clusters.len() instead
         
         // Get counts
         let edge_count = self.edges.iter().filter(|edge| edge.visible).count();
         let node_count = self.nodes.len();
         let connected_node_count = connected_nodes_count; // Nodes with connections
-        let cluster_count = real_clusters;
+        let cluster_count = connected_clusters.len(); // Only use connected clusters with 2+ nodes
         
         // Create cluster sizes
         let mut cluster_sizes: Vec<usize> = connected_clusters.values()
@@ -736,4 +770,5 @@ impl TransmissionNetwork {
             .map(|node| node.degree > 0)
             .unwrap_or(false)
     }
+    
 }
