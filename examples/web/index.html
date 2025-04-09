@@ -1,202 +1,259 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <meta charset="utf-8">
+  <head>
+    <meta charset="utf-8" />
     <title>HIVCluster-RS Web Demo</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        textarea {
-            width: 100%;
-            height: 200px;
-            font-family: monospace;
-            margin-bottom: 20px;
-        }
-        button {
-            padding: 10px 15px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        .output {
-            margin-top: 20px;
-            border: 1px solid #ddd;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border-radius: 4px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        .stats {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 20px;
-        }
-        .stat-box {
-            background-color: #f0f7ff;
-            padding: 15px;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            width: 22%;
-            text-align: center;
-        }
-        .stat-box h3 {
-            margin-top: 0;
-            font-size: 14px;
-            color: #333;
-        }
-        .stat-box p {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 5px 0;
-            color: #0066cc;
-        }
-        #visualization {
-            width: 100%;
-            height: 500px;
-            border: 1px solid #ddd;
-            margin-top: 20px;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+
+      textarea {
+        width: 100%;
+        height: 200px;
+        font-family: monospace;
+        margin-bottom: 20px;
+      }
+
+      button {
+        padding: 10px 15px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+
+      button:hover {
+        background-color: #45a049;
+      }
+
+      .output {
+        margin-top: 20px;
+        border: 1px solid #ddd;
+        padding: 15px;
+        background-color: #f9f9f9;
+        border-radius: 4px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+
+      th {
+        background-color: #f2f2f2;
+      }
+
+      .stats {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+
+      .stat-box {
+        background-color: #f0f7ff;
+        padding: 15px;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        width: 22%;
+        text-align: center;
+      }
+
+      .stat-box h3 {
+        margin-top: 0;
+        font-size: 14px;
+        color: #333;
+      }
+
+      .stat-box p {
+        font-size: 24px;
+        font-weight: bold;
+        margin: 5px 0;
+        color: #0066cc;
+      }
+
+      #visualization {
+        width: 100%;
+        height: 500px;
+        border: 1px solid #ddd;
+        margin-top: 20px;
+      }
     </style>
-</head>
-<body>
+  </head>
+
+  <body>
     <h1>HIVCluster-RS Web Demo</h1>
-    
+
     <div>
-        <h2>Input CSV Data</h2>
-        <p>Enter comma-separated values with three columns: ID1,ID2,distance</p>
-        <textarea id="csvInput">ID1,ID2,0.01
-ID1,ID3,0.02
-ID2,ID4,0.015
-ID3,ID4,0.01
-ID5,ID6,0.025
-ID7,ID8,0.01</textarea>
-        
-        <div>
-            <label for="threshold">Distance Threshold:</label>
-            <input type="number" id="threshold" value="0.03" step="0.005" min="0.001" max="0.5">
-        </div>
-        
-        <button id="processBtn">Process Network</button>
+      <h2>Input CSV Data</h2>
+      <p>Enter comma-separated values with three columns: ID1,ID2,distance</p>
+      <textarea id="csvInput">
+            ID1,ID2,0.01
+            ID1,ID3,0.02
+            ID2,ID4,0.015
+            ID3,ID4,0.01
+            ID5,ID6,0.025
+            ID7,ID8,0.01</textarea
+      >
+
+      <div>
+        <label for="threshold">Distance Threshold:</label>
+        <input
+          type="number"
+          id="threshold"
+          value="0.03"
+          step="0.005"
+          min="0.001"
+          max="0.5"
+        />
+      </div>
+
+      <button id="processBtn">Process Network</button>
     </div>
-    
-    <div id="results" style="display: none;">
-        <h2>Network Results</h2>
-        
-        <div class="stats">
-            <div class="stat-box">
-                <h3>Nodes</h3>
-                <p id="nodeCount">0</p>
-            </div>
-            <div class="stat-box">
-                <h3>Edges</h3>
-                <p id="edgeCount">0</p>
-            </div>
-            <div class="stat-box">
-                <h3>Clusters</h3>
-                <p id="clusterCount">0</p>
-            </div>
-            <div class="stat-box">
-                <h3>Largest Cluster</h3>
-                <p id="largestCluster">0</p>
-            </div>
+
+    <div id="results" style="display: none">
+      <h2>Network Results</h2>
+
+      <div class="stats">
+        <div class="stat-box">
+          <h3>Nodes</h3>
+          <p id="nodeCount">0</p>
         </div>
-        
-        <h3>Network Visualization</h3>
-        <div id="visualization"></div>
-        
-        <h3>Cluster Details</h3>
-        <table id="clusterTable">
-            <thead>
-                <tr>
-                    <th>Cluster ID</th>
-                    <th>Size</th>
-                    <th>Nodes</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-        
-        <h3>Raw JSON Output</h3>
-        <textarea id="jsonOutput" readonly></textarea>
+        <div class="stat-box">
+          <h3>Edges</h3>
+          <p id="edgeCount">0</p>
+        </div>
+        <div class="stat-box">
+          <h3>Clusters</h3>
+          <p id="clusterCount">0</p>
+        </div>
+        <div class="stat-box">
+          <h3>Largest Cluster</h3>
+          <p id="largestCluster">0</p>
+        </div>
+      </div>
+
+      <h3>Network Visualization</h3>
+      <div id="visualization"></div>
+
+      <h3>Cluster Details</h3>
+      <table id="clusterTable">
+        <thead>
+          <tr>
+            <th>Cluster ID</th>
+            <th>Size</th>
+            <th>Nodes</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <h3>Raw JSON Output</h3>
+      <textarea id="jsonOutput" readonly></textarea>
     </div>
-    
+
     <script type="module">
-        import init, { build_network } from '../../pkg/web/hivcluster_rs.js';
-        
-        async function run() {
-            await init();
-            
-            document.getElementById('processBtn').addEventListener('click', function() {
-                const csvData = document.getElementById('csvInput').value;
-                const threshold = parseFloat(document.getElementById('threshold').value);
-                
-                try {
-                    // Build the network
-                    const networkData = build_network(csvData, threshold);
-                    
-                    // Show results
-                    document.getElementById('results').style.display = 'block';
-                    
-                    // Update statistics
-                    document.getElementById('nodeCount').textContent = networkData.nodes.length;
-                    document.getElementById('edgeCount').textContent = networkData.edges.length;
-                    document.getElementById('clusterCount').textContent = networkData.clusters.length;
-                    
-                    // Find largest cluster
-                    const largestCluster = networkData.clusters.reduce((max, cluster) => 
-                        cluster.size > max ? cluster.size : max, 0);
-                    document.getElementById('largestCluster').textContent = largestCluster;
-                    
-                    // Populate cluster table
-                    const tableBody = document.getElementById('clusterTable').querySelector('tbody');
-                    tableBody.innerHTML = '';
-                    
-                    networkData.clusters.forEach(cluster => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td>${cluster.id}</td>
-                            <td>${cluster.size}</td>
-                            <td>${cluster.nodes.join(', ')}</td>
-                        `;
-                        tableBody.appendChild(row);
-                    });
-                    
-                    // Show raw JSON
-                    document.getElementById('jsonOutput').value = JSON.stringify(networkData, null, 2);
-                    
-                    // TODO: Add visualization with a library like d3.js or vis.js
-                    
-                } catch (error) {
-                    alert('Error processing network: ' + error.message);
-                    console.error(error);
+      // For local development
+      import init, { build_network } from "../../pkg/web/hivcluster_rs.js";
+
+      // For npm package usage
+      // import init, { build_network } from 'hivcluster_rs_web';
+
+      async function run() {
+        await init();
+
+        document
+          .getElementById("processBtn")
+          .addEventListener("click", function () {
+            const csvData = document.getElementById("csvInput").value;
+            const threshold = parseFloat(
+              document.getElementById("threshold").value,
+            );
+
+            try {
+              // Build the network
+              const jsonString = build_network(csvData, threshold, "plain");
+              const networkData = JSON.parse(jsonString)["trace_results"];
+              console.log(networkData);
+
+              // Show results
+              document.getElementById("results").style.display = "block";
+
+              // Update statistics
+              document.getElementById("nodeCount").textContent =
+                networkData["Network Summary"]["Nodes"];
+              document.getElementById("edgeCount").textContent =
+                networkData["Network Summary"]["Edges"];
+              document.getElementById("clusterCount").textContent =
+                networkData["Network Summary"]["Clusters"];
+
+              // Find largest cluster
+              const largestCluster = Math.max(...networkData["Cluster sizes"]);
+              document.getElementById("largestCluster").textContent =
+                largestCluster;
+
+              // Populate cluster table
+              const tableBody = document
+                .getElementById("clusterTable")
+                .querySelector("tbody");
+              tableBody.innerHTML = "";
+              
+              // Create rows for each cluster
+              const clusterCount = networkData["Network Summary"]["Clusters"];
+              const nodeIds = networkData["Nodes"]["id"];
+              const clusterIds = networkData["Nodes"]["cluster"];
+              
+              // Group nodes by cluster
+              const clusters = {};
+              for (let i = 0; i < nodeIds.length; i++) {
+                const clusterId = clusterIds[i];
+                if (!clusters[clusterId]) {
+                  clusters[clusterId] = [];
                 }
-            });
-        }
-        
-        run();
+                clusters[clusterId].push(nodeIds[i]);
+              }
+              
+              // Create table rows
+              Object.keys(clusters).forEach(clusterId => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                  <td>${clusterId}</td>
+                  <td>${clusters[clusterId].length}</td>
+                  <td>${clusters[clusterId].join(", ")}</td>
+                `;
+                tableBody.appendChild(row);
+              });
+
+              // Show raw JSON
+              document.getElementById("jsonOutput").value = JSON.stringify(
+                networkData,
+                null,
+                2,
+              );
+
+              // TODO: Add visualization with a library like d3.js or vis.js
+            } catch (error) {
+              alert("Error processing network: " + error.message);
+              console.error(error);
+            }
+          });
+      }
+
+      run();
     </script>
-</body>
+  </body>
 </html>
