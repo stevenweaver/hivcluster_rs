@@ -1,0 +1,80 @@
+{
+  "nodes": [
+    {
+      "id": "ID1",
+      "cluster": null,
+      "degree": 0,
+      "attributes": []
+    },
+    {
+      "id": "ID3",
+      "cluster": null,
+      "degree": 0,
+      "attributes": []
+    },
+    {
+      "id": "ID2",
+      "cluster": null,
+      "degree": 0,
+      "attributes": []
+    },
+    {
+      "id": "ID4",
+      "cluster": null,
+      "degree": 0,
+      "attributes": []
+    },
+    {
+      "id": "ID5",
+      "cluster": null,
+      "degree": 0,
+      "attributes": []
+    },
+    {
+      "id": "ID6",
+      "cluster": null,
+      "degree": 0,
+      "attributes": []
+    },
+    {
+      "id": "ID7",
+      "cluster": null,
+      "degree": 0,
+      "attributes": []
+    },
+    {
+      "id": "ID8",
+      "cluster": null,
+      "degree": 0,
+      "attributes": []
+    }
+  ],
+  "edges": [
+    {
+      "source": "ID1",
+      "target": "ID3",
+      "distance": 0.02,
+      "visible": true
+    },
+    {
+      "source": "ID2",
+      "target": "ID4",
+      "distance": 0.015,
+      "visible": true
+    },
+    {
+      "source": "ID5",
+      "target": "ID6",
+      "distance": 0.03,
+      "visible": true
+    },
+    {
+      "source": "ID7",
+      "target": "ID8",
+      "distance": 0.01,
+      "visible": true
+    }
+  ],
+  "clusters": [],
+  "metadata": {}
+}
