@@ -1,9 +1,7 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::rc::Rc;
+use std::cmp::Ordering;
 use thiserror::Error;
 
 /// Error types for network operations
@@ -23,10 +21,13 @@ pub enum NetworkError {
     
     #[error("Cannot create self-loop (node connecting to itself)")]
     SelfLoop,
+    
+    #[error("JSON serialization error: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 /// Available input formats for parsing node IDs
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputFormat {
     /// ID | sample_date | otherfields
     AEH,
@@ -39,7 +40,7 @@ pub enum InputFormat {
 }
 
 /// A node in the network representing a patient
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Patient {
     pub id: String,
     pub dates: Vec<Option<DateTime<Utc>>>,
@@ -51,10 +52,11 @@ pub struct Patient {
     pub cluster_id: Option<usize>,
     pub treatment_naive: Option<bool>,
     pub attributes: HashSet<String>,
-    pub named_attributes: std::collections::HashMap<String, String>,
+    pub named_attributes: HashMap<String, String>,
 }
 
 impl Patient {
+    /// Create a new patient with the given ID
     pub fn new(id: &str) -> Self {
         Patient {
             id: id.to_string(),
@@ -67,38 +69,53 @@ impl Patient {
             cluster_id: None,
             treatment_naive: None,
             attributes: HashSet::new(),
-            named_attributes: std::collections::HashMap::new(),
+            named_attributes: HashMap::new(),
         }
     }
 
+    /// Add a date to this patient's collection dates
     pub fn add_date(&mut self, date: Option<DateTime<Utc>>) {
         if !self.dates.contains(&date) {
             self.dates.push(date);
         }
     }
 
+    /// Add an attribute to this patient
     pub fn add_attribute(&mut self, attr: &str) {
         self.attributes.insert(attr.to_string());
     }
     
+    /// Check if patient has a specific attribute
     pub fn has_attribute(&self, attr: &str) -> bool {
         self.attributes.contains(attr)
     }
     
+    /// Remove an attribute from this patient
     pub fn remove_attribute(&mut self, attr: &str) {
         self.attributes.remove(attr);
     }
     
+    /// Add a named attribute with a value
     pub fn add_named_attribute(&mut self, key: &str, value: Option<String>) {
         if let Some(val) = value {
-            self.named_attributes.insert(key.to_string(), val);
+            if !val.is_empty() {
+                self.named_attributes.insert(key.to_string(), val);
+            }
         } else if self.named_attributes.contains_key(key) {
             self.named_attributes.remove(key);
         }
     }
     
+    /// Increment the degree (number of connections) for this patient
     pub fn increment_degree(&mut self) {
         self.degree += 1;
+    }
+    
+    /// Get the most recent date if available
+    pub fn get_most_recent_date(&self) -> Option<DateTime<Utc>> {
+        self.dates.iter()
+            .filter_map(|&date| date)
+            .max()
     }
 }
 
@@ -108,31 +125,17 @@ impl Hash for Patient {
     }
 }
 
-impl PartialEq for Patient {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl Eq for Patient {}
-
 impl PartialOrd for Patient {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Patient {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id)
+        Some(self.id.cmp(&other.id))
     }
 }
 
 /// A connection between two patients in the network
 #[derive(Debug, Clone)]
 pub struct Edge {
-    pub source: Rc<Patient>,
-    pub target: Rc<Patient>,
+    pub source_id: String,
+    pub target_id: String,
     pub source_date: Option<DateTime<Utc>>,
     pub target_date: Option<DateTime<Utc>>,
     pub visible: bool,
@@ -143,31 +146,33 @@ pub struct Edge {
 }
 
 impl Edge {
+    /// Create a new edge between two patients
     pub fn new(
-        source: Rc<Patient>, 
-        target: Rc<Patient>,
+        source_id: String, 
+        target_id: String,
         source_date: Option<DateTime<Utc>>,
         target_date: Option<DateTime<Utc>>,
-        visible: bool,
         distance: f64,
     ) -> Result<Self, NetworkError> {
         // Ensure no self-loops
-        if Rc::ptr_eq(&source, &target) {
+        if source_id == target_id {
             return Err(NetworkError::SelfLoop);
         }
         
-        let (source, target, source_date, target_date) = if source.id < target.id {
-            (source, target, source_date, target_date)
+        // Always normalize source_id and target_id to ensure source_id < target_id
+        // This maintains consistent edge representation
+        let (source_id, target_id, source_date, target_date) = if source_id < target_id {
+            (source_id, target_id, source_date, target_date)
         } else {
-            (target, source, target_date, source_date)
+            (target_id, source_id, target_date, source_date)
         };
         
         Ok(Edge {
-            source,
-            target,
+            source_id,
+            target_id,
             source_date,
             target_date,
-            visible,
+            visible: true,
             attributes: HashSet::new(),
             sequences: None,
             distance,
@@ -175,18 +180,22 @@ impl Edge {
         })
     }
     
+    /// Add an attribute to this edge
     pub fn add_attribute(&mut self, attr: &str) {
         self.attributes.insert(attr.to_string());
     }
     
+    /// Check if edge has a specific attribute
     pub fn has_attribute(&self, attr: &str) -> bool {
         self.attributes.contains(attr)
     }
     
+    /// Remove an attribute from this edge
     pub fn remove_attribute(&mut self, attr: &str) {
         self.attributes.remove(attr);
     }
     
+    /// Update sequence information for this edge
     pub fn update_sequence_info(&mut self, seq_info: Vec<String>) {
         self.sequences = Some(seq_info);
     }
@@ -205,37 +214,35 @@ impl Edge {
         
         source_date_ok && target_date_ok
     }
-}
-
-impl Hash for Edge {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        // Use pointer equality for the patient Rcs
-        std::ptr::addr_of!(*self.source).hash(state);
-        std::ptr::addr_of!(*self.target).hash(state);
-        
-        // Only include dates in hash if comparing edge versions with the same nodes
-        if let Some(date) = &self.source_date {
-            date.hash(state);
-        }
-        if let Some(date) = &self.target_date {
-            date.hash(state);
-        }
+    
+    /// Get the edge key (source_id, target_id) for consistent lookup
+    pub fn get_key(&self) -> (String, String) {
+        (self.source_id.clone(), self.target_id.clone())
     }
 }
 
-impl PartialEq for Edge {
-    fn eq(&self, other: &Self) -> bool {
-        // Check if nodes are the same (using pointer equality)
-        let nodes_equal = Rc::ptr_eq(&self.source, &other.source) && 
-                        Rc::ptr_eq(&self.target, &other.target);
-        
-        // If nodes are the same, check dates
-        if nodes_equal {
-            self.source_date == other.source_date && self.target_date == other.target_date
-        } else {
-            false
+/// A parsed patient ID with metadata
+#[derive(Debug, Clone)]
+pub struct ParsedPatient {
+    pub id: String,
+    pub date: Option<DateTime<Utc>>,
+    pub attributes: HashMap<String, String>,
+}
+
+impl ParsedPatient {
+    /// Create a new parsed patient
+    pub fn new(id: String, date: Option<DateTime<Utc>>) -> Self {
+        ParsedPatient {
+            id,
+            date,
+            attributes: HashMap::new(),
+        }
+    }
+
+    /// Add an attribute to this parsed patient
+    pub fn add_attribute(&mut self, key: &str, value: String) {
+        if !value.is_empty() {
+            self.attributes.insert(key.to_string(), value);
         }
     }
 }
-
-impl Eq for Edge {}

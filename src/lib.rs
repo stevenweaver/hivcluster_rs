@@ -1,57 +1,94 @@
-use wasm_bindgen::prelude::*;
 mod network;
 mod parser;
 mod types;
 mod utils;
 
-pub use network::*;
-pub use parser::*;
-pub use types::*;
-pub use utils::*;
+// Re-export main types and functions
+pub use network::TransmissionNetwork;
+pub use types::{InputFormat, NetworkError, Edge, Patient, ParsedPatient};
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
-
-/// Initialize panic hook for better error reporting in WASM
-#[wasm_bindgen(start)]
-pub fn start() {
-    #[cfg(target_arch = "wasm32")]
-    console_error_panic_hook::set_once();
-}
-
-/// Main entry point for WASM bindings to build a network from CSV data
-#[wasm_bindgen]
-pub fn build_network(csv_data: &str, distance_threshold: f64) -> JsValue {
-    // Create network
-    let mut network = TransmissionNetwork::new();
+#[cfg(target_arch = "wasm32")]
+mod wasm {
+    use wasm_bindgen::prelude::*;
+    use super::*;
     
-    // Process the network
-    if let Err(e) = network.read_from_csv_str(csv_data, distance_threshold, InputFormat::Plain) {
-        log(&format!("Error building network: {}", e));
-        return JsValue::NULL;
+    // Initialize logging for WASM
+    #[wasm_bindgen(start)]
+    pub fn init() {
+        utils::setup_logging();
     }
     
-    // Compute clusters
-    network.compute_clusters();
+    /// WASM bindings for the network builder
+    #[wasm_bindgen]
+    pub fn build_network(
+        csv_data: &str,
+        threshold: f64,
+        format: &str,
+    ) -> Result<String, JsValue> {
+        let input_format = match format.to_lowercase().as_str() {
+            "aeh" => InputFormat::AEH,
+            "lanl" => InputFormat::LANL,
+            "regex" => InputFormat::Regex,
+            _ => InputFormat::Plain,
+        };
+        
+        // Build the network
+        let result = build_network_internal(csv_data, threshold, input_format)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+            
+        Ok(result)
+    }
     
-    // Convert to JSON and return
-    let json = serde_json::to_string(&network.to_json()).unwrap_or_else(|_| "{}".to_string());
-    JsValue::from_str(&json)
+    /// Get network statistics in JSON format
+    #[wasm_bindgen]
+    pub fn get_network_stats(
+        csv_data: &str,
+        threshold: f64,
+        format: &str,
+    ) -> Result<String, JsValue> {
+        let input_format = match format.to_lowercase().as_str() {
+            "aeh" => InputFormat::AEH,
+            "lanl" => InputFormat::LANL,
+            "regex" => InputFormat::Regex,
+            _ => InputFormat::Plain,
+        };
+        
+        // Create a new network
+        let mut network = TransmissionNetwork::new();
+        
+        // Parse CSV and build the network
+        network.read_from_csv_str(csv_data, threshold, input_format)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        
+        // Compute the network structure
+        network.compute_adjacency();
+        network.compute_clusters();
+        
+        // Get stats as JSON
+        let stats = network.get_network_stats();
+        let json = serde_json::to_string(&stats)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+            
+        Ok(json)
+    }
 }
 
-/// Build network from CSV data
-pub fn build_network_internal(csv_data: &str, distance_threshold: f64) -> Result<TransmissionNetwork, NetworkError> {
-    // Create network
+/// Build network and return JSON representation
+pub fn build_network_internal(
+    csv_data: &str,
+    threshold: f64,
+    format: InputFormat,
+) -> Result<String, NetworkError> {
+    // Create a new network
     let mut network = TransmissionNetwork::new();
     
-    // Process the network
-    network.read_from_csv_str(csv_data, distance_threshold, InputFormat::Plain)?;
+    // Parse CSV and build the network
+    network.read_from_csv_str(csv_data, threshold, format)?;
     
-    // Compute clusters
+    // Compute the network structure
+    network.compute_adjacency();
     network.compute_clusters();
     
-    Ok(network)
+    // Convert to JSON string
+    network.to_json_string()
 }
