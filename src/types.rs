@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::cmp::Ordering;
 use thiserror::Error;
 
 /// Error types for network operations
@@ -9,19 +9,19 @@ use thiserror::Error;
 pub enum NetworkError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("CSV parsing error: {0}")]
     Csv(#[from] csv::Error),
-    
+
     #[error("Invalid data format: {0}")]
     Format(String),
-    
+
     #[error("Missing required field: {0}")]
     MissingField(String),
-    
+
     #[error("Cannot create self-loop (node connecting to itself)")]
     SelfLoop,
-    
+
     #[error("JSON serialization error: {0}")]
     Json(#[from] serde_json::Error),
 }
@@ -45,7 +45,7 @@ pub struct Patient {
     pub id: String,
     pub dates: Vec<Option<DateTime<Utc>>>,
     pub edi: Option<DateTime<Utc>>, // estimated date of infection
-    pub stage: String, // disease stage
+    pub stage: String,              // disease stage
     pub treatment_date: Option<DateTime<Utc>>,
     pub viral_load: Option<f64>,
     pub degree: usize,
@@ -84,17 +84,17 @@ impl Patient {
     pub fn add_attribute(&mut self, attr: &str) {
         self.attributes.insert(attr.to_string());
     }
-    
+
     /// Check if patient has a specific attribute
     pub fn has_attribute(&self, attr: &str) -> bool {
         self.attributes.contains(attr)
     }
-    
+
     /// Remove an attribute from this patient
     pub fn remove_attribute(&mut self, attr: &str) {
         self.attributes.remove(attr);
     }
-    
+
     /// Add a named attribute with a value
     pub fn add_named_attribute(&mut self, key: &str, value: Option<String>) {
         if let Some(val) = value {
@@ -105,17 +105,15 @@ impl Patient {
             self.named_attributes.remove(key);
         }
     }
-    
+
     /// Increment the degree (number of connections) for this patient
     pub fn increment_degree(&mut self) {
         self.degree += 1;
     }
-    
+
     /// Get the most recent date if available
     pub fn get_most_recent_date(&self) -> Option<DateTime<Utc>> {
-        self.dates.iter()
-            .filter_map(|&date| date)
-            .max()
+        self.dates.iter().filter_map(|&date| date).max()
     }
 }
 
@@ -148,7 +146,7 @@ pub struct Edge {
 impl Edge {
     /// Create a new edge between two patients
     pub fn new(
-        source_id: String, 
+        source_id: String,
         target_id: String,
         source_date: Option<DateTime<Utc>>,
         target_date: Option<DateTime<Utc>>,
@@ -158,7 +156,7 @@ impl Edge {
         if source_id == target_id {
             return Err(NetworkError::SelfLoop);
         }
-        
+
         // Always normalize source_id and target_id to ensure source_id < target_id
         // This maintains consistent edge representation
         let (source_id, target_id, source_date, target_date) = if source_id < target_id {
@@ -166,7 +164,7 @@ impl Edge {
         } else {
             (target_id, source_id, target_date, source_date)
         };
-        
+
         Ok(Edge {
             source_id,
             target_id,
@@ -179,42 +177,54 @@ impl Edge {
             is_unsupported: false,
         })
     }
-    
+
     /// Add an attribute to this edge
     pub fn add_attribute(&mut self, attr: &str) {
         self.attributes.insert(attr.to_string());
     }
-    
+
     /// Check if edge has a specific attribute
     pub fn has_attribute(&self, attr: &str) -> bool {
         self.attributes.contains(attr)
     }
-    
+
     /// Remove an attribute from this edge
     pub fn remove_attribute(&mut self, attr: &str) {
         self.attributes.remove(attr);
     }
-    
+
     /// Update sequence information for this edge
     pub fn update_sequence_info(&mut self, seq_info: Vec<String>) {
         self.sequences = Some(seq_info);
     }
-    
+
     /// Check if the edge dates meet a specific date condition
     pub fn check_date(&self, date: &DateTime<Utc>, newer: bool) -> bool {
         let source_date_ok = match self.source_date {
-            Some(d) => if newer { d >= *date } else { d <= *date },
+            Some(d) => {
+                if newer {
+                    d >= *date
+                } else {
+                    d <= *date
+                }
+            }
             None => true, // If date is missing, consider it passing the condition
         };
-        
+
         let target_date_ok = match self.target_date {
-            Some(d) => if newer { d >= *date } else { d <= *date },
+            Some(d) => {
+                if newer {
+                    d >= *date
+                } else {
+                    d <= *date
+                }
+            }
             None => true, // If date is missing, consider it passing the condition
         };
-        
+
         source_date_ok && target_date_ok
     }
-    
+
     /// Get the edge key (source_id, target_id) for consistent lookup
     pub fn get_key(&self) -> (String, String) {
         (self.source_id.clone(), self.target_id.clone())

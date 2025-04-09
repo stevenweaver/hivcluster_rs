@@ -21,7 +21,7 @@ pub fn compare_dates(date1: &Option<DateTime<Utc>>, date2: &Option<DateTime<Utc>
 #[cfg(target_arch = "wasm32")]
 pub fn setup_logging() {
     use wasm_bindgen::prelude::*;
-    
+
     // Set panic hook to log panics to console
     console_error_panic_hook::set_once();
 }
