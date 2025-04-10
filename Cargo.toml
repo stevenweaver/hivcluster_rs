@@ -1,6 +1,6 @@
 [package]
 name = "hivcluster_rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Claude <claude@anthropic.com>"]
 description = "A Rust implementation of HIVClustering network construction functionality"
@@ -29,6 +29,7 @@ web-sys = { version = "0.3", features = ["console"] }
 [features]
 default = []
 parallel = ["rayon"]
+annotation = []
 
 [dev-dependencies]
 criterion = "0.4"

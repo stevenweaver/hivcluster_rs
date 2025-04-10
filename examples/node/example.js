@@ -1,6 +1,10 @@
 const fs = require('fs');
 const path = require('path');
-const { build_network } = require('../../pkg/node');
+// For local development
+// const { build_network } = require('../../pkg/node');
+
+// For npm package usage
+const { build_network } = require('hivcluster_rs_node');
 
 // Define a sample CSV or read from a file
 const sampleCSV = `ID1,ID2,0.01
