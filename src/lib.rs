@@ -2,10 +2,12 @@ mod network;
 mod parser;
 mod types;
 mod utils;
+mod annotate;
 
 // Re-export main types and functions
 pub use network::TransmissionNetwork;
 pub use types::{Edge, InputFormat, NetworkError, ParsedPatient, Patient};
+pub use annotate::{annotate_network, AnnotationError};
 
 #[cfg(target_arch = "wasm32")]
 mod wasm {
@@ -66,6 +68,27 @@ mod wasm {
         let json = serde_json::to_string(&stats).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
         Ok(json)
+    }
+    
+    /// WASM bindings for the network annotator
+    #[wasm_bindgen]
+    pub fn annotate_network_json(
+        network_json: &str,
+        attributes_json: &str,
+        schema_json: &str,
+    ) -> Result<String, JsValue> {
+        // Call the annotation function
+        #[cfg(feature = "annotation")]
+        {
+            let result = annotate::annotate_network(network_json, attributes_json, schema_json)
+                .map_err(|e| JsValue::from_str(&e.to_string()))?;
+            return Ok(result);
+        }
+        
+        #[cfg(not(feature = "annotation"))]
+        {
+            return Err(JsValue::from_str("Annotation feature is not enabled. Rebuild with --features annotation"));
+        }
     }
 }
 

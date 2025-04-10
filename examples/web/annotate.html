@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HIVAnnotate Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .file-input {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            overflow: auto;
+            border-radius: 5px;
+        }
+        .stats {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>HIVAnnotate Web Example</h1>
+    
+    <div class="file-input">
+        <label for="networkFile">Network JSON:</label>
+        <input type="file" id="networkFile" accept=".json">
+    </div>
+    
+    <div class="file-input">
+        <label for="attributesFile">Attributes JSON:</label>
+        <input type="file" id="attributesFile" accept=".json">
+    </div>
+    
+    <div class="file-input">
+        <label for="schemaFile">Schema JSON:</label>
+        <input type="file" id="schemaFile" accept=".json">
+    </div>
+    
+    <button id="annotateBtn" disabled>Annotate Network</button>
+    
+    <div class="stats" id="stats" style="display: none;">
+        <h2>Annotation Results</h2>
+        <div id="statsContent"></div>
+        <button id="downloadBtn">Download Annotated Network</button>
+    </div>
+    
+    <script type="module">
+        // Import the WASM module
+        import * as hivannotate from '../../pkg/hivannotate-web/hivannotate_rs_web.js';
+        
+        // Initialize the WASM module
+        await hivannotate.default();
+        
+        let networkJson, attributesJson, schemaJson, annotatedJson;
+        const networkFileInput = document.getElementById('networkFile');
+        const attributesFileInput = document.getElementById('attributesFile');
+        const schemaFileInput = document.getElementById('schemaFile');
+        const annotateBtn = document.getElementById('annotateBtn');
+        const statsDiv = document.getElementById('stats');
+        const statsContent = document.getElementById('statsContent');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        // Check if all files are selected to enable the annotate button
+        function checkFiles() {
+            if (networkFileInput.files.length > 0 && 
+                attributesFileInput.files.length > 0 && 
+                schemaFileInput.files.length > 0) {
+                annotateBtn.disabled = false;
+            } else {
+                annotateBtn.disabled = true;
+            }
+        }
+        
+        // Read a file as text
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = event => resolve(event.target.result);
+                reader.onerror = error => reject(error);
+                reader.readAsText(file);
+            });
+        }
+        
+        // Set up event listeners
+        [networkFileInput, attributesFileInput, schemaFileInput].forEach(input => {
+            input.addEventListener('change', checkFiles);
+        });
+        
+        annotateBtn.addEventListener('click', async () => {
+            try {
+                // Read files
+                networkJson = await readFileAsText(networkFileInput.files[0]);
+                attributesJson = await readFileAsText(attributesFileInput.files[0]);
+                schemaJson = await readFileAsText(schemaFileInput.files[0]);
+                
+                // Annotate network
+                annotatedJson = hivannotate.annotate_network_json(networkJson, attributesJson, schemaJson);
+                
+                // Display stats
+                displayStats(annotatedJson);
+                
+                // Show stats div
+                statsDiv.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error: ${error.message || 'Unknown error'}`);
+            }
+        });
+        
+        // Display statistics from the annotated network
+        function displayStats(jsonStr) {
+            const result = JSON.parse(jsonStr);
+            const hasTraceResults = result.trace_results !== undefined;
+            const rootObj = hasTraceResults ? result.trace_results : result;
+            
+            // Count nodes with annotations
+            const totalNodes = rootObj.Nodes.length;
+            const nodesWithAttributes = rootObj.Nodes.filter(n => 
+                n.patient_attributes !== undefined).length;
+            
+            // Get schema fields
+            const schemaFields = Object.keys(rootObj.patient_attribute_schema || {});
+            
+            // Create HTML content
+            let html = `
+                <p><strong>Network Nodes:</strong> ${totalNodes}</p>
+                <p><strong>Nodes Annotated:</strong> ${nodesWithAttributes}</p>
+                <p><strong>Annotation Rate:</strong> ${Math.round(nodesWithAttributes/totalNodes*100)}%</p>
+                <p><strong>Attribute Fields:</strong></p>
+                <ul>
+                    ${schemaFields.map(field => `<li>${field}</li>`).join('')}
+                </ul>
+            `;
+            
+            statsContent.innerHTML = html;
+        }
+        
+        // Set up download button
+        downloadBtn.addEventListener('click', () => {
+            if (!annotatedJson) return;
+            
+            const blob = new Blob([annotatedJson], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'annotated_network.json';
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 0);
+        });
+    </script>
+</body>
+</html>
